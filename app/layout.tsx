@@ -7,7 +7,7 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "Restaurant Management System",
   description: "Complete restaurant management solution with POS, kitchen display, and analytics",
-  generator: "v0.app",
+  generator: "sabih software design compnay",
 }
 
 export default function RootLayout({
