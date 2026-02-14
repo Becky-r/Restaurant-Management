@@ -7,9 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Clock, ChefHat, CheckCircle, AlertTriangle, ArrowLeft, Timer, Users, MapPin, RefreshCw } from "lucide-react"
-import { dataStore } from "@/lib/data-store"
-import { initializeSampleData } from "@/lib/sample-data"
 import type { Order } from "@/lib/types"
+import { getKitchenOrders, updateKitchenOrderStatus } from "@/lib/actions"
 
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -19,7 +18,6 @@ export default function KitchenPage() {
   const [autoRefresh, setAutoRefresh] = useState(true)
 
   useEffect(() => {
-    initializeSampleData()
     loadOrders()
 
     // Update current time every second
@@ -44,11 +42,16 @@ export default function KitchenPage() {
     filterOrders()
   }, [orders, typeFilter])
 
-  const loadOrders = () => {
-    const ordersData = dataStore.getOrders()
-    // Only show orders that need kitchen attention (new and preparing)
-    const kitchenOrders = ordersData.filter((order) => order.status === "new" || order.status === "preparing")
-    setOrders(kitchenOrders)
+  const loadOrders = async () => {
+    try {
+      const ordersData = await getKitchenOrders()
+      // Only show orders that need kitchen attention (new and preparing)
+      // The server action already filters for pending/new/preparing but we can double check
+      const kitchenOrders = ordersData.filter((order) => order.status === "new" || order.status === "preparing")
+      setOrders(kitchenOrders)
+    } catch (error) {
+      console.error("Failed to load orders:", error)
+    }
   }
 
   const filterOrders = () => {
@@ -69,16 +72,35 @@ export default function KitchenPage() {
     setFilteredOrders(filtered)
   }
 
-  const updateOrderStatus = (orderId: string, newStatus: Order["status"]) => {
+  const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
+    // Optimistic update
+    const previousOrders = [...orders]
+
+    // Update local state to reflect change immediately
     const updatedOrders = orders.map((order) => {
       if (order.id === orderId) {
-        const updatedOrder = { ...order, status: newStatus, updatedAt: new Date() }
-        dataStore.saveOrder(updatedOrder)
-        return updatedOrder
+        return { ...order, status: newStatus, updatedAt: new Date() }
       }
       return order
     })
-    setOrders(updatedOrders.filter((order) => order.status === "new" || order.status === "preparing"))
+
+    // If status is not kitchen relevant (e.g. ready/served), filter it out
+    const finalOrders = updatedOrders.filter((order) =>
+      (newStatus === "ready" || newStatus === "served" || newStatus === "cancelled")
+        ? order.id !== orderId
+        : true
+    )
+
+    setOrders(finalOrders.filter(o => o.status === "new" || o.status === "preparing"))
+
+    try {
+      await updateKitchenOrderStatus(orderId, newStatus)
+    } catch (error) {
+      console.error("Failed to update status:", error)
+      // Revert on error
+      setOrders(previousOrders)
+      // Optionally show toast/alert here
+    }
   }
 
   const startOrder = (orderId: string) => {
