@@ -10,12 +10,52 @@ import { Clock, ChefHat, CheckCircle, AlertTriangle, ArrowLeft, Timer, Users, Ma
 import type { Order } from "@/lib/types"
 import { getKitchenOrders, updateKitchenOrderStatus } from "@/lib/actions"
 
+import { io } from "socket.io-client"
+
 export default function KitchenPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [currentTime, setCurrentTime] = useState(new Date())
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    // Socket.io connection
+    const socket = io("http://localhost:4000")
+    
+    socket.emit("join-kitchen")
+
+    socket.on("new-order", (newOrder: any) => {
+      console.log("New order received via socket:", newOrder)
+      
+      // Play notification sound
+      const audio = new Audio("/notification.mp3")
+      audio.play().catch(e => console.log("Sound play failed", e))
+
+      setOrders(prev => {
+        // Avoid duplicates
+        if (prev.some(o => o.id === newOrder.id)) return prev
+        
+        // Parse dates from JSON string
+        const parsedOrder = {
+          ...newOrder,
+          createdAt: new Date(newOrder.createdAt),
+          updatedAt: newOrder.updatedAt ? new Date(newOrder.updatedAt) : new Date(),
+          estimatedReadyTime: newOrder.estimatedReadyTime ? new Date(newOrder.estimatedReadyTime) : undefined
+        }
+        
+        const updated = [parsedOrder, ...prev]
+        return updated.filter(o => o.status === "PENDING" || o.status === "PREPARING" || o.status === "new" || o.status === "preparing")
+      })
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     loadOrders()
@@ -25,12 +65,12 @@ export default function KitchenPage() {
       setCurrentTime(new Date())
     }, 1000)
 
-    // Auto-refresh orders every 30 seconds
+    // Manual refresh still helpful as fallback
     const refreshInterval = setInterval(() => {
       if (autoRefresh) {
         loadOrders()
       }
-    }, 30000)
+    }, 60000)
 
     return () => {
       clearInterval(timeInterval)
@@ -44,11 +84,17 @@ export default function KitchenPage() {
 
   const loadOrders = async () => {
     try {
-      const ordersData = await getKitchenOrders()
-      // Only show orders that need kitchen attention (new and preparing)
-      // The server action already filters for pending/new/preparing but we can double check
-      const kitchenOrders = ordersData.filter((order) => order.status === "new" || order.status === "preparing")
-      setOrders(kitchenOrders)
+      const resp = await fetch("http://localhost:4000/api/orders/active")
+      const ordersData = await resp.json()
+      
+      const parsedOrders = ordersData.map((o: any) => ({
+        ...o,
+        createdAt: new Date(o.createdAt),
+        updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date(),
+        estimatedReadyTime: o.estimatedReadyTime ? new Date(o.estimatedReadyTime) : undefined
+      }))
+      
+      setOrders(parsedOrders)
     } catch (error) {
       console.error("Failed to load orders:", error)
     }
@@ -62,10 +108,10 @@ export default function KitchenPage() {
       filtered = filtered.filter((order) => order.orderType === typeFilter)
     }
 
-    // Sort by priority: new orders first, then by creation time
+    // Sort by priority: PENDING first, then by creation time
     filtered.sort((a, b) => {
-      if (a.status === "new" && b.status === "preparing") return -1
-      if (a.status === "preparing" && b.status === "new") return 1
+      if (a.status === "PENDING" && b.status === "PREPARING") return -1
+      if (a.status === "PREPARING" && b.status === "PENDING") return 1
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     })
 
@@ -175,8 +221,8 @@ export default function KitchenPage() {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <div className="text-lg font-mono font-bold">{currentTime.toLocaleTimeString()}</div>
-                <div className="text-sm text-muted-foreground">{currentTime.toLocaleDateString()}</div>
+                <div className="text-lg font-mono font-bold">{mounted ? currentTime.toLocaleTimeString() : "--:--:--"}</div>
+                <div className="text-sm text-muted-foreground">{mounted ? currentTime.toLocaleDateString() : "--"}</div>
               </div>
               <Button
                 variant={autoRefresh ? "default" : "outline"}

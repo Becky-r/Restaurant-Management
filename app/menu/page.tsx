@@ -80,11 +80,12 @@ export default function PublicMenuPage() {
                   {category.items.map((item) => (
                     <Card key={item.id} className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow">
                       {item.image && (
-                        <div className="aspect-video w-full bg-slate-200 relative">
-                           {/* Image placeholder */}
-                           <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                             Image
-                           </div>
+                        <div className="aspect-video w-full bg-slate-200 relative overflow-hidden">
+                           <img 
+                             src={item.image.startsWith("http") ? item.image : `http://localhost:4000${item.image}`}
+                             alt={item.name}
+                             className="w-full h-full object-cover"
+                           />
                         </div>
                       )}
                       <CardHeader className="p-4 pb-2">

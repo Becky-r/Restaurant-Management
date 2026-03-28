@@ -25,7 +25,7 @@ export interface Order {
   tableNumber?: string
   customerName?: string
   orderType: "dine-in" | "takeaway" | "delivery"
-  status: "new" | "preparing" | "ready" | "served" | "cancelled"
+  status: "new" | "preparing" | "ready" | "served" | "cancelled" | "PENDING" | "PREPARING" | "READY" | "PAID"
   notes?: string
   subtotal: number
   tax: number

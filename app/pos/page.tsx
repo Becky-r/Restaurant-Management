@@ -29,11 +29,34 @@ export default function POSPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showReceiptDialog, setShowReceiptDialog] = useState(false)
   const [lastOrder, setLastOrder] = useState<Order | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    initializeSampleData()
-    setMenuItems(dataStore.getMenuItems())
-    setTables(dataStore.getTables())
+    setMounted(true)
+    const fetchData = async () => {
+      try {
+        const menuResp = await fetch("http://localhost:4000/api/public/menu")
+        const menuData = await menuResp.json()
+        
+        // The API returns an array of Categories, each containing an 'items' array.
+        // We need to flatten this into a single array of items for the POS UI to display.
+        const flatItems = menuData.flatMap((category: any) => 
+          category.items.map((item: any) => ({
+            ...item,
+            available: item.isAvailable, // map to frontend field name
+            category: category.name.toLowerCase()
+          }))
+        )
+        setMenuItems(flatItems)
+        
+        // Use static tables for now or fetch if available
+        initializeSampleData()
+        setTables(dataStore.getTables())
+      } catch (err) {
+        console.error("Failed to fetch menu:", err)
+      }
+    }
+    fetchData()
   }, [])
 
   const filteredMenuItems = menuItems.filter(
@@ -46,7 +69,7 @@ export default function POSPage() {
       setCart(
         cart.map((item) =>
           item.menuItem.id === menuItem.id
-            ? { ...item, quantity: item.quantity + 1, price: item.price + menuItem.price }
+            ? { ...item, quantity: item.quantity + 1, price: (item.quantity + 1) * menuItem.price }
             : item,
         ),
       )
@@ -94,47 +117,57 @@ export default function POSPage() {
     return subtotal + tax
   }
 
-  const processOrder = () => {
+  const printReceipt = () => {
+    window.print();
+  }
+
+  const processOrder = async () => {
     if (cart.length === 0) return
 
-    const subtotal = calculateSubtotal()
-    const tax = calculateTax(subtotal)
     const total = calculateTotal()
 
-    const order: Order = {
-      id: dataStore.generateId(),
-      orderNumber: dataStore.generateOrderNumber(),
-      items: cart,
-      tableNumber: orderType === "dine-in" ? selectedTable : undefined,
-      customerName: customerName || undefined,
-      orderType,
-      status: "new",
-      notes: orderNotes || undefined,
-      subtotal,
-      tax,
-      total,
+    const orderData = {
+      items: cart.map(item => ({
+        menuItemId: item.menuItem.id,
+        quantity: item.quantity,
+        priceAtTime: item.menuItem.price,
+        notes: item.notes
+      })),
+      waiterName: "Staff-01", // Should come from auth
+      tableId: orderType === "dine-in" ? selectedTable : "Takeaway",
       paymentMethod,
-      paymentStatus: "paid",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      staffId: "1", // Current user ID
-      estimatedReadyTime: new Date(Date.now() + 20 * 60 * 1000), // 20 minutes from now
+      totalAmount: total
     }
 
-    dataStore.saveOrder(order)
+    try {
+      const resp = await fetch("http://localhost:4000/api/orders/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData)
+      })
 
-    // Update table status if dine-in
-    if (orderType === "dine-in" && selectedTable) {
-      const table = tables.find((t) => t.number === selectedTable)
-      if (table) {
-        dataStore.saveTable({ ...table, status: "occupied", currentOrderId: order.id })
+      if (resp.ok) {
+        const result = await resp.json()
+        setLastOrder({
+          ...result.order,
+          createdAt: new Date(result.order.createdAt),
+          subtotal: calculateSubtotal(),
+          tax: calculateTax(calculateSubtotal()),
+          total: calculateTotal(),
+          orderType: orderType, // Added for receipt display logic
+          items: cart // Keep rich cart items for display
+        })
+        setShowPaymentDialog(false)
+        setShowReceiptDialog(true)
+        clearCart()
+      } else {
+        const err = await resp.json()
+        alert(`Order failed: ${err.error}`)
       }
+    } catch (err) {
+      console.error(err)
+      alert("Network error. Please check server.")
     }
-
-    setLastOrder(order)
-    setShowPaymentDialog(false)
-    setShowReceiptDialog(true)
-    clearCart()
   }
 
   return (
@@ -154,7 +187,7 @@ export default function POSPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="outline">{new Date().toLocaleTimeString()}</Badge>
+              <Badge variant="outline">{mounted ? new Date().toLocaleTimeString() : "--:--:--"}</Badge>
             </div>
           </div>
         </div>
