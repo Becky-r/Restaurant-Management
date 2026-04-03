@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   generator: "sabih software design compnay",
 }
 
+import { AuthProvider } from "@/lib/auth-context"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,7 +28,11 @@ html {
 }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   )
 }

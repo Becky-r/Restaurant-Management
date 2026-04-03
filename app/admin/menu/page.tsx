@@ -29,7 +29,11 @@ interface Category {
 
 const FIXED_CATEGORY_NAMES = ["Food", "Drinks", "Juice", "Desserts", "Specials"]
 
+import { useAuth } from "@/lib/auth-context"
+import { api, authFetch } from "@/lib/api"
+
 export default function AdminMenuPage() {
+  const { user } = useAuth()
   const [items, setItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +43,7 @@ export default function AdminMenuPage() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
 
   // Form state
+  // ... (keep form states)
   const [formName, setFormName] = useState("")
   const [formDescription, setFormDescription] = useState("")
   const [formPrice, setFormPrice] = useState("")
@@ -48,16 +53,14 @@ export default function AdminMenuPage() {
   const [formImagePreview, setFormImagePreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const API_BASE = "http://localhost:4000/api/admin"
-
   const fetchMenuData = async () => {
     setLoading(true)
     try {
-      const resp = await fetch(`${API_BASE}/menu`)
+      const resp = await api.get("/api/menu")
       const data = await resp.json()
       setItems(data)
 
-      const catResp = await fetch(`${API_BASE}/categories`)
+      const catResp = await api.get("/api/categories")
       const catData = await catResp.json()
       setCategories(catData)
     } catch (err) {
@@ -71,6 +74,7 @@ export default function AdminMenuPage() {
     fetchMenuData()
   }, [])
 
+  // ... (keep resetForm, handleImageSelect, removeImage)
   const resetForm = () => {
     setFormName("")
     setFormDescription("")
@@ -104,7 +108,7 @@ export default function AdminMenuPage() {
     }
 
     try {
-      const url = selectedItem ? `${API_BASE}/menu/${selectedItem.id}` : `${API_BASE}/menu`
+      const url = selectedItem ? `/api/menu/${selectedItem.id}` : "/api/menu"
       const method = selectedItem ? "PATCH" : "POST"
 
       const formDataObj = new FormData()
@@ -117,11 +121,14 @@ export default function AdminMenuPage() {
         formDataObj.append("image", formImageFile)
       }
 
-      const response = await fetch(url, {
+      // Special handling for FormData with authFetch
+      const response = await authFetch(url, {
         method,
-        headers: { "x-api-key": "your-secret-api-key" },
         body: formDataObj,
-      })
+        headers: {
+            // Let the browser set Content-Type with boundary for FormData
+        },
+      } as any)
 
       if (response.ok) {
         setShowAddDialog(false)
@@ -140,12 +147,13 @@ export default function AdminMenuPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return
     try {
-      await fetch(`${API_BASE}/menu/${id}`, { method: "DELETE" })
+      await api.delete(`/api/menu/${id}`)
       fetchMenuData()
     } catch (err) {
       console.error(err)
     }
   }
+
 
   const openEdit = (item: MenuItem) => {
     setSelectedItem(item)
@@ -188,10 +196,12 @@ export default function AdminMenuPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
-              <Button size="sm" onClick={openAdd}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Dish
-              </Button>
+              {user?.role === "ADMIN" && (
+                <Button size="sm" onClick={openAdd}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Dish
+                </Button>
+              )}
               <Button size="sm" variant="secondary" onClick={() => setShowQRDialog(true)}>
                 <QrCode className="h-4 w-4 mr-2" />
                 Menu QR
@@ -231,15 +241,17 @@ export default function AdminMenuPage() {
                       {item.description}
                     </p>
                     <p className="text-lg font-bold text-primary mb-4">{item.price} ETB</p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(item)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(item.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {user?.role === "ADMIN" && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(item)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleDelete(item.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )

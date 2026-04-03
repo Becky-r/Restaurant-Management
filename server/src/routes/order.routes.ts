@@ -139,4 +139,45 @@ router.post('/orders/finalize', async (req: any, res: Response) => {
   }
 });
 
+// PATCH /api/orders/:id/status - Update order status (KDS -> Waiter sync)
+router.patch('/orders/:id/status', async (req: any, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  // Validate status against Prisma OrderStatus enum
+  const validStatuses = ['PENDING', 'PREPARING', 'READY', 'PAID'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+  }
+
+  try {
+    const order = await prisma.order.update({
+      where: { id },
+      data: { status: status as any },
+      include: {
+        items: {
+          include: {
+            menuItem: {
+              include: {
+                category: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Real-time Trigger: Emit Socket.io event
+    const io = req.io;
+    if (io) {
+      io.emit('order-updated', order);
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
 export default router;

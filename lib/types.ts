@@ -3,39 +3,35 @@ export interface MenuItem {
   name: string
   description: string
   price: number
-  category: "food" | "drinks" | "combos"
+  category: "food" | "drinks" | "combos" | any // Allowing any for Category object
   image?: string
-  available: boolean
+  isAvailable: boolean
   ingredients: string[]
   preparationTime: number // in minutes
   allergens?: string[]
 }
 
 export interface OrderItem {
+  id: string
+  orderId: string
+  menuItemId: string
   menuItem: MenuItem
   quantity: number
+  priceAtTime: number
   notes?: string
-  price: number
 }
 
 export interface Order {
   id: string
   orderNumber: string
   items: OrderItem[]
-  tableNumber?: string
-  customerName?: string
-  orderType: "dine-in" | "takeaway" | "delivery"
-  status: "new" | "preparing" | "ready" | "served" | "cancelled" | "PENDING" | "PREPARING" | "READY" | "PAID"
-  notes?: string
-  subtotal: number
-  tax: number
-  total: number
-  paymentMethod?: "cash" | "card" | "telebirr" | "mobile"
-  paymentStatus: "pending" | "paid" | "refunded"
+  tableId?: string
+  waiterName?: string
+  status: "PENDING" | "PREPARING" | "READY" | "PAID"
   createdAt: Date
   updatedAt: Date
-  staffId: string
-  estimatedReadyTime?: Date
+  staffId?: string
+  receipt?: any
 }
 
 export interface Staff {

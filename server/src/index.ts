@@ -7,6 +7,15 @@ import { Server } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import menuRoutes from './routes/menu.routes';
 import orderRoutes from './routes/order.routes';
+import staffRoutes from './routes/staff.routes';
+import inventoryRoutes from './routes/inventory.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import supplyRequestsRoutes from './routes/supply-requests.routes';
+import purchaseOrdersRoutes from './routes/purchase-orders.routes';
+import inventoryAuditRoutes from './routes/inventory-audit.routes';
+
+import authRoutes from './routes/auth.routes';
+import { verifyToken, checkRole } from './middleware/auth.middleware';
 
 dotenv.config();
 
@@ -15,7 +24,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
   },
 });
 
@@ -52,6 +61,11 @@ io.on('connection', (socket) => {
     console.log(`Socket ${socket.id} joined kitchen room`);
   });
 
+  socket.on('join-inventory', () => {
+    socket.join('inventory');
+    console.log(`Socket ${socket.id} joined inventory room`);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
@@ -63,13 +77,29 @@ app.use((req: any, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api', menuRoutes);
-app.use('/api', orderRoutes);
+// Public Routes
+app.use('/api', authRoutes);
 
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
+
+// Protected Routes (Require JWT)
+app.use('/api/*', verifyToken); // Apply to all subsequent /api routes
+
+// Waiters, Cashiers, Chefs, Admin can access these based on specific logic inside if needed,
+// but for now we protect them with general authentication
+app.use('/api', orderRoutes);
+app.use('/api', menuRoutes);
+
+// Admin-Only Routes
+app.use('/api/admin', checkRole(['ADMIN']));
+app.use('/api', staffRoutes);
+app.use('/api', inventoryRoutes);
+app.use('/api', dashboardRoutes);
+app.use('/api', supplyRequestsRoutes);
+app.use('/api', purchaseOrdersRoutes);
+app.use('/api', inventoryAuditRoutes);
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

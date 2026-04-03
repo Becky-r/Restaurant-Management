@@ -21,16 +21,70 @@ enum OrderStatus {
   PAID
 }
 
+enum StaffRole {
+  ADMIN
+  CASHIER
+  WAITER
+  CHEF
+}
+
+enum SupplyRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  ADMIN_APPROVED
+  RECEIVED
+}
+
+model Staff {
+  id        String    @id @default(uuid())
+  name      String
+  username  String    @unique
+  email     String    @unique
+  password  String
+  phone     String
+  role      StaffRole @default(CASHIER)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  orders    Order[]
+
+  supplyRequests     SupplyRequest[]  @relation("ChefRequests")
+  managedRequests    SupplyRequest[]  @relation("ManagerApprovals")
+  purchases          PurchaseOrder[]  @relation("ManagerPurchases")
+  auditRequestedList InventoryAudit[] @relation("AuditRequestedBy")
+  auditApprovedList  InventoryAudit[] @relation("AuditApprovedBy")
+}
+
+model InventoryItem {
+  id            String           @id @default(uuid())
+  name          String
+  category      String
+  unit          String
+  currentStock  Float            @default(0)
+  minStock      Float            @default(0)
+  maxStock      Float            @default(0)
+  unitCost      Float            @default(0)
+  supplier      String?
+  lastRestocked DateTime?
+  createdAt     DateTime         @default(now())
+  audits        InventoryAudit[]
+}
+
 model MenuItem {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  price       Float
-  image       String?
-  isAvailable Boolean  @default(true)
-  category    Category @relation(fields: [categoryId], references: [id])
-  categoryId  String
-  orderItems  OrderItem[]
+  id              String      @id @default(uuid())
+  name            String
+  description     String
+  price           Float
+  image           String?
+  isAvailable     Boolean     @default(true)
+  preparationTime Int         @default(15)
+  category        Category    @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  orderItems      OrderItem[]
 }
 
 model Order {
@@ -41,19 +95,21 @@ model Order {
   createdAt   DateTime    @default(now())
   waiterName  String?
   tableId     String?
+  staffId     String?
+  staff       Staff?      @relation(fields: [staffId], references: [id])
   items       OrderItem[]
   receipt     Receipt?
 }
 
 model OrderItem {
-  id         String   @id @default(uuid())
-  order      Order    @relation(fields: [orderId], references: [id])
-  orderId    String
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
-  menuItemId String
-  quantity   Int
+  id          String   @id @default(uuid())
+  order       Order    @relation(fields: [orderId], references: [id])
+  orderId     String
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId  String
+  quantity    Int
   priceAtTime Float
-  notes      String?
+  notes       String?
 }
 
 model Receipt {
@@ -63,4 +119,38 @@ model Receipt {
   receiptNumber String   @unique
   paymentMethod String
   timestamp     DateTime @default(now())
+}
+
+model SupplyRequest {
+  id          String              @id @default(uuid())
+  chef        Staff               @relation("ChefRequests", fields: [chefId], references: [id])
+  chefId      String
+  items       Json
+  status      SupplyRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  managedBy   Staff?              @relation("ManagerApprovals", fields: [managedById], references: [id])
+  managedById String?
+}
+
+model PurchaseOrder {
+  id                 String              @id @default(uuid())
+  manager            Staff               @relation("ManagerPurchases", fields: [managerId], references: [id])
+  managerId          String
+  items              Json
+  totalEstimatedCost Float
+  status             PurchaseOrderStatus @default(PENDING)
+  createdAt          DateTime            @default(now())
+}
+
+model InventoryAudit {
+  id             String        @id @default(uuid())
+  actionType     String // "SUPPLY_REQUEST", "PURCHASE_ORDER", "MANUAL_ADJUSTMENT"
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id])
+  quantityChange Float
+  requestedBy    Staff?        @relation("AuditRequestedBy", fields: [requestedById], references: [id])
+  requestedById  String?
+  approvedBy     Staff?        @relation("AuditApprovedBy", fields: [approvedById], references: [id])
+  approvedById   String?
+  createdAt      DateTime      @default(now())
 }

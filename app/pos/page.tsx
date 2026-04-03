@@ -16,7 +16,11 @@ import { dataStore } from "@/lib/data-store"
 import { initializeSampleData } from "@/lib/sample-data"
 import type { MenuItem, OrderItem, Order, Table } from "@/lib/types"
 
+import { api } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
+
 export default function POSPage() {
+  const { user } = useAuth()
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [tables, setTables] = useState<Table[]>([])
   const [cart, setCart] = useState<OrderItem[]>([])
@@ -35,21 +39,24 @@ export default function POSPage() {
     setMounted(true)
     const fetchData = async () => {
       try {
-        const menuResp = await fetch("http://localhost:4000/api/public/menu")
+        const menuResp = await api.get("/api/menu")
         const menuData = await menuResp.json()
         
-        // The API returns an array of Categories, each containing an 'items' array.
-        // We need to flatten this into a single array of items for the POS UI to display.
-        const flatItems = menuData.flatMap((category: any) => 
-          category.items.map((item: any) => ({
-            ...item,
-            available: item.isAvailable, // map to frontend field name
-            category: category.name.toLowerCase()
-          }))
-        )
+        // Flatten the data structure from backend: Array of category names with items
+        // Note: The backend previously sent categories, let's ensure structure matches
+        // If the backend returns flat items, we adjust. Assuming standard category structure.
+        let flatItems = []
+        if (Array.isArray(menuData)) {
+           flatItems = menuData.flatMap((category: any) => 
+            category.items.map((item: any) => ({
+              ...item,
+              available: item.isAvailable,
+              category: category.name.toLowerCase()
+            }))
+          )
+        }
         setMenuItems(flatItems)
         
-        // Use static tables for now or fetch if available
         initializeSampleData()
         setTables(dataStore.getTables())
       } catch (err) {
@@ -58,6 +65,7 @@ export default function POSPage() {
     }
     fetchData()
   }, [])
+
 
   const filteredMenuItems = menuItems.filter(
     (item) => item.available && (selectedCategory === "all" || item.category === selectedCategory),
@@ -133,18 +141,15 @@ export default function POSPage() {
         priceAtTime: item.menuItem.price,
         notes: item.notes
       })),
-      waiterName: "Staff-01", // Should come from auth
+      waiterName: user?.username || "Staff",
       tableId: orderType === "dine-in" ? selectedTable : "Takeaway",
       paymentMethod,
       totalAmount: total
     }
 
     try {
-      const resp = await fetch("http://localhost:4000/api/orders/finalize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData)
-      })
+      const resp = await api.post("/api/orders/finalize", orderData)
+
 
       if (resp.ok) {
         const result = await resp.json()
