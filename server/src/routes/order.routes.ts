@@ -1,14 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { generateOrderNumber } from '../utils';
+import prisma from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
-
-// Helper to generate order number
-const generateOrderNumber = async () => {
-  const count = await prisma.order.count();
-  return `#${(count + 1).toString().padStart(4, '0')}`;
-};
 
 // GET /api/orders/active - Fetch pending orders for KDS
 router.get('/orders/active', async (req: Request, res: Response) => {

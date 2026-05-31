@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/inventory — List all items (filterable by ?category= and ?stockLevel=low|out)
 router.get('/inventory', async (req: Request, res: Response) => {

@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import { checkRole } from '../middleware/auth.middleware';
+import prisma from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Chef submits a new supply request
 router.post('/supply-requests', checkRole(['CHEF']), async (req: any, res) => {

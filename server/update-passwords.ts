@@ -1,15 +1,14 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+// Removed bcrypt
+import prisma from './src/lib/prisma';
 
-const prisma = new PrismaClient();
 
 async function updateCredentials() {
   console.log('Updating credentials...');
 
   try {
-    const adminHash = await bcrypt.hash('password123', 10);
-    const chefHash = await bcrypt.hash('pasword123', 10); // Extracted exact spelling from prompt
-    const cashierHash = await bcrypt.hash('password123', 10);
+    const adminHash = 'password123';
+    const chefHash = 'password123';
+    const cashierHash = 'password123';
 
     // Update or Create Admin
     await prisma.staff.upsert({

@@ -154,3 +154,11 @@ model InventoryAudit {
   approvedById   String?
   createdAt      DateTime      @default(now())
 }
+
+model Tool {
+  id        String   @id @default(uuid())
+  name      String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

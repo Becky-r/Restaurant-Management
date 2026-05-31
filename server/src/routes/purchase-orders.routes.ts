@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import { checkRole } from '../middleware/auth.middleware';
+import prisma from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Admin creates a new purchase order
 router.post('/purchase-orders', checkRole(['ADMIN']), async (req: any, res) => {

@@ -1,59 +1,59 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const existingAdmin = await prisma.staff.findFirst({
-    where: { role: 'ADMIN' }
+  const adminHash = 'admin123';
+  const chefHash = 'chef123';
+  const waiterHash = 'waiter123';
+  const cashierHash = 'cashier123';
+
+  // 1. Admin
+  await prisma.staff.upsert({
+    where: { username: 'admin' },
+    update: { password: adminHash, role: 'ADMIN', isActive: true },
+    create: { name: 'System Admin', username: 'admin', email: 'admin@restaurant.com', phone: '1000', password: adminHash, role: 'ADMIN' }
   });
 
-  const hashedPassword = await bcrypt.hash('admin123', 10);
-
-  if (existingAdmin) {
-    console.log('Admin already exists, updating credentials...');
-    await prisma.staff.update({
-      where: { id: existingAdmin.id },
-      data: {
-        username: 'admin',
-        password: hashedPassword,
-      }
-    });
-    console.log('Admin credentials updated! Username: admin, Password: admin123');
-  } else {
-    // There was an existing staff member in the DB, let's just make sure there is an admin
-    console.log('Creating new admin user...');
-    await prisma.staff.create({
-      data: {
-        name: 'System Admin',
-        username: 'admin',
-        email: 'admin@restaurant.com',
-        phone: '1234567890',
-        password: hashedPassword,
-        role: 'ADMIN',
-      }
-    });
-    console.log('Admin created! Username: admin, Password: admin123');
-  }
-
-  // Update existing staffs without username/password to have defaults so we can make the fields mandatory later
-  const staffsWithoutCreds = await prisma.staff.findMany({
-    where: { OR: [{ username: null }, { password: null }] }
+  // 2. Second Admin
+  await prisma.staff.upsert({
+    where: { username: 'admin2' },
+    update: { password: adminHash, role: 'ADMIN', isActive: true },
+    create: { name: 'Backup Admin', username: 'admin2', email: 'admin2@restaurant.com', phone: '1001', password: adminHash, role: 'ADMIN' }
   });
 
-  if (staffsWithoutCreds.length > 0) {
-    const defaultPassword = await bcrypt.hash('password123', 10);
-    for (const staff of staffsWithoutCreds) {
-      await prisma.staff.update({
-        where: { id: staff.id },
-        data: {
-          username: `user_${staff.id.substring(0,6)}`,
-          password: defaultPassword
-        }
-      });
-      console.log(`Updated staff ${staff.name} with default credentials`);
-    }
-  }
+  // 3. Chef
+  await prisma.staff.upsert({
+    where: { username: 'chef1' },
+    update: { password: chefHash, role: 'CHEF', isActive: true },
+    create: { name: 'Head Chef', username: 'chef1', email: 'chef1@restaurant.com', phone: '2000', password: chefHash, role: 'CHEF' }
+  });
+
+  // 4. Waiter
+  await prisma.staff.upsert({
+    where: { username: 'waiter1' },
+    update: { password: waiterHash, role: 'WAITER', isActive: true },
+    create: { name: 'Lead Waiter', username: 'waiter1', email: 'waiter1@restaurant.com', phone: '3000', password: waiterHash, role: 'WAITER' }
+  });
+
+  // 5. Cashier
+  await prisma.staff.upsert({
+    where: { username: 'cashier1' },
+    update: { password: cashierHash, role: 'CASHIER', isActive: true },
+    create: { name: 'Front Desk', username: 'cashier1', email: 'cashier1@restaurant.com', phone: '4000', password: cashierHash, role: 'CASHIER' }
+  });
+
+  const credentials = [
+    { role: 'ADMIN', username: 'admin', password: 'admin123' },
+    { role: 'ADMIN', username: 'admin2', password: 'admin123' },
+    { role: 'CHEF', username: 'chef1', password: 'chef123' },
+    { role: 'WAITER', username: 'waiter1', password: 'waiter123' },
+    { role: 'CASHIER', username: 'cashier1', password: 'cashier123' }
+  ];
+
+  console.log('\n--- Seed Complete! Staff Credentials ---');
+  console.table(credentials);
+  console.log('----------------------------------------\n');
 }
 
 main()

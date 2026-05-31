@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import http from 'http';
 import path from 'path';
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
 import menuRoutes from './routes/menu.routes';
 import orderRoutes from './routes/order.routes';
 import staffRoutes from './routes/staff.routes';
@@ -13,9 +12,13 @@ import dashboardRoutes from './routes/dashboard.routes';
 import supplyRequestsRoutes from './routes/supply-requests.routes';
 import purchaseOrdersRoutes from './routes/purchase-orders.routes';
 import inventoryAuditRoutes from './routes/inventory-audit.routes';
+import reportsRoutes from './routes/reports.routes';
+import toolsRoutes from './routes/tools.routes';
+import posRoutes from './routes/pos.routes';
 
 import authRoutes from './routes/auth.routes';
 import { verifyToken, checkRole } from './middleware/auth.middleware';
+import prisma from './lib/prisma';
 
 dotenv.config();
 
@@ -36,7 +39,6 @@ app.use(express.json());
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-const prisma = new PrismaClient();
 
 // Seed fixed categories on startup
 const FIXED_CATEGORIES = ['Food', 'Drinks', 'Juice', 'Desserts', 'Specials'];
@@ -79,6 +81,7 @@ app.use((req: any, res, next) => {
 
 // Public Routes
 app.use('/api', authRoutes);
+app.use('/api', menuRoutes); // Registered before verifyToken so /api/public/menu is accessible without auth. Admin routes inside have their own adminAuth guard.
 
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
@@ -90,17 +93,23 @@ app.use('/api/*', verifyToken); // Apply to all subsequent /api routes
 // Waiters, Cashiers, Chefs, Admin can access these based on specific logic inside if needed,
 // but for now we protect them with general authentication
 app.use('/api', orderRoutes);
-app.use('/api', menuRoutes);
+app.use('/api', posRoutes);
 
 // Admin-Only Routes
 app.use('/api/admin', checkRole(['ADMIN']));
-app.use('/api', staffRoutes);
+app.use('/api/staff', checkRole(['ADMIN']), staffRoutes);
 app.use('/api', inventoryRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', supplyRequestsRoutes);
 app.use('/api', purchaseOrdersRoutes);
 app.use('/api', inventoryAuditRoutes);
+app.use('/api', reportsRoutes);
+app.use('/api', toolsRoutes);
 
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+export default app;

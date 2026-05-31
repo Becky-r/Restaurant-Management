@@ -1,10 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import prisma from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_in_production';
 
 // POST /api/auth/login
@@ -28,7 +26,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Account is inactive' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, staff.password);
+    const isPasswordValid = (password === staff.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
